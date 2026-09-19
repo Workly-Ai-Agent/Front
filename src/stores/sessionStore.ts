@@ -25,10 +25,12 @@ type SessionState = {
     name: string;
     initials: string;
   };
+  accessToken: string | null;
   dashboardStats: DashboardStat[];
   workforceMembers: WorkforceMember[];
   agentActivities: AgentActivity[];
   setUser: (user: SessionState["user"]) => void;
+  setAccessToken: (accessToken: string | null) => void;
   setDashboardStats: (stats: DashboardStat[]) => void;
   setWorkforceMembers: (members: WorkforceMember[]) => void;
   setAgentActivities: (activities: AgentActivity[]) => void;
@@ -41,6 +43,7 @@ export const useSessionStore = create<SessionState>()(
         name: "Sarah Choi",
         initials: "SC",
       },
+      accessToken: null,
       dashboardStats: [
         { label: "진행 중인 프로젝트", value: "08", change: "이번 달 +2" },
         { label: "전체 구성원", value: "32", change: "가용 인력 +4" },
@@ -90,6 +93,14 @@ export const useSessionStore = create<SessionState>()(
         },
       ],
       setUser: (user) => set({ user }),
+      setAccessToken: (accessToken) => {
+        if (accessToken) {
+          localStorage.setItem("workly-access-token", accessToken);
+        } else {
+          localStorage.removeItem("workly-access-token");
+        }
+        set({ accessToken });
+      },
       setDashboardStats: (dashboardStats) => set({ dashboardStats }),
       setWorkforceMembers: (workforceMembers) => set({ workforceMembers }),
       setAgentActivities: (agentActivities) => set({ agentActivities }),
