@@ -1,15 +1,45 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { login } from "../lib/api";
+import { useSessionStore } from "../stores/sessionStore";
 
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const setUser = useSessionStore((state) => state.setUser);
+  const setAccessToken = useSessionStore((state) => state.setAccessToken);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    navigate("/");
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const result = await login(email, password);
+      setAccessToken(result.token);
+      setUser({
+        name: result.name,
+        initials: result.name
+          .split(" ")
+          .map((part) => part[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase(),
+      });
+      navigate("/");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "로그인에 실패했습니다.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -42,6 +72,11 @@ export default function Login() {
           <p className="my-4 mb-9 leading-[1.6] text-[#647278]">
             Workly 워크스페이스에 로그인하세요.
           </p>
+          {error && (
+            <p className="mb-4 rounded-md bg-[#fff1f0] px-4 py-3 text-sm text-[#b42318]">
+              {error}
+            </p>
+          )}
           <label className="mt-5 grid gap-2 text-[13px] font-bold text-[#304047]">
             이메일
             <input
@@ -83,9 +118,10 @@ export default function Login() {
           </div>
           <button
             type="submit"
+            disabled={isSubmitting}
             className="w-full rounded-md bg-[#18252d] px-5 py-[15px] font-bold text-[#f4f6f3] transition hover:-translate-y-px hover:bg-[#304047]"
           >
-            로그인 →
+            {isSubmitting ? "로그인 중..." : "로그인 →"}
           </button>
           <p className="mt-6 text-center text-[13px] text-[#647278]">
             아직 계정이 없나요?{" "}

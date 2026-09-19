@@ -1,15 +1,32 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { signup } from "../lib/api";
 export default function Signup() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    navigate("/");
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      await signup(name, email, password);
+      navigate("/login");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "회원가입에 실패했습니다.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -48,6 +65,11 @@ export default function Signup() {
           <p className="my-4 mb-9 leading-[1.6] text-[#647278]">
             가입 후 새 팀을 만들거나 초대받은 팀에 참여할 수 있습니다.
           </p>
+          {error && (
+            <p className="mb-4 rounded-md bg-[#fff1f0] px-4 py-3 text-sm text-[#b42318]">
+              {error}
+            </p>
+          )}
           <label
             className="mt-5 grid gap-2 text-[13px] font-bold text-[#304047]"
             htmlFor="name"
@@ -113,9 +135,10 @@ export default function Signup() {
           </label>
           <button
             type="submit"
+            disabled={isSubmitting}
             className="mt-7 w-full rounded-md bg-[#18252d] px-5 py-[15px] font-bold text-[#f4f6f3] transition hover:-translate-y-px hover:bg-[#304047]"
           >
-            개인 계정 만들기 →
+            {isSubmitting ? "가입 중..." : "개인 계정 만들기 →"}
           </button>
           <p className="mt-6 text-center text-[13px] text-[#647278]">
             이미 계정이 있나요?{" "}
