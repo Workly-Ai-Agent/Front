@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { getUserIdFromToken } from "../lib/api";
 
 export type DashboardStat = {
   label: string;
@@ -20,17 +21,22 @@ export type AgentActivity = {
   tone: "default" | "orange";
 };
 
+export type UserInfo = {
+  id?: number | null;
+  name: string;
+  email?: string;
+  initials: string;
+};
+
 type SessionState = {
-  user: {
-    name: string;
-    initials: string;
-  };
+  user: UserInfo;
   accessToken: string | null;
   dashboardStats: DashboardStat[];
   workforceMembers: WorkforceMember[];
   agentActivities: AgentActivity[];
-  setUser: (user: SessionState["user"]) => void;
+  setUser: (user: UserInfo) => void;
   setAccessToken: (accessToken: string | null) => void;
+  logout: () => void;
   setDashboardStats: (stats: DashboardStat[]) => void;
   setWorkforceMembers: (members: WorkforceMember[]) => void;
   setAgentActivities: (activities: AgentActivity[]) => void;
@@ -40,7 +46,9 @@ export const useSessionStore = create<SessionState>()(
   persist(
     (set) => ({
       user: {
+        id: 1,
         name: "Sarah Choi",
+        email: "sarah@workly.com",
         initials: "SC",
       },
       accessToken: null,
@@ -96,10 +104,31 @@ export const useSessionStore = create<SessionState>()(
       setAccessToken: (accessToken) => {
         if (accessToken) {
           localStorage.setItem("workly-access-token", accessToken);
+          const userId = getUserIdFromToken(accessToken);
+          if (userId) {
+            set((state) => ({
+              user: { ...state.user, id: userId },
+              accessToken,
+            }));
+            return;
+          }
         } else {
           localStorage.removeItem("workly-access-token");
         }
         set({ accessToken });
+      },
+      logout: () => {
+        localStorage.removeItem("workly-access-token");
+        localStorage.removeItem("workly-active-workspace-id");
+        set({
+          accessToken: null,
+          user: {
+            id: null,
+            name: "게스트",
+            email: "",
+            initials: "GT",
+          },
+        });
       },
       setDashboardStats: (dashboardStats) => set({ dashboardStats }),
       setWorkforceMembers: (workforceMembers) => set({ workforceMembers }),
