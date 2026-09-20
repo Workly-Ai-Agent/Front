@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { login } from "../lib/api";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { getUserIdFromToken, login } from "../lib/api";
 import { useSessionStore } from "../stores/sessionStore";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -22,6 +23,8 @@ export default function Login() {
       const result = await login(email, password);
       setAccessToken(result.token);
       setUser({
+        id: getUserIdFromToken(result.token),
+        email: result.email,
         name: result.name,
         initials: result.name
           .split(" ")
@@ -30,7 +33,10 @@ export default function Login() {
           .slice(0, 2)
           .toUpperCase(),
       });
-      navigate("/");
+      const from =
+        (location.state as { from?: { pathname?: string } })?.from?.pathname ||
+        "/";
+      navigate(from, { replace: true });
     } catch (submitError) {
       setError(
         submitError instanceof Error
