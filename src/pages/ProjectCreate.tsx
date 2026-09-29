@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import {
   createProject,
+  addProjectMember,
   getWorkspaceMembers,
   type WorkspaceMember,
 } from "../lib/api";
@@ -32,8 +33,10 @@ export default function ProjectCreate() {
   // Project form fields
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [planText, setPlanText] = useState("");
   const [leaderId, setLeaderId] = useState<number>(currentUser.id ?? 1);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
   // New Workspace inline creation state (if needed)
@@ -111,6 +114,7 @@ export default function ProjectCreate() {
     }
   };
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedWorkspaceId) {
@@ -131,6 +135,11 @@ export default function ProjectCreate() {
         description: description.trim() || undefined,
         leaderId: Number(leaderId),
       });
+      await Promise.all(
+        selectedMemberIds
+          .filter((userId) => userId !== Number(leaderId))
+          .map((userId) => addProjectMember(created.id, { userId }))
+      );
       navigate(`/projects/${created.id}`);
     } catch (err) {
       setError(
@@ -290,14 +299,14 @@ export default function ProjectCreate() {
                     required
                     value={selectedWorkspaceId ?? ""}
                     onChange={(e) =>
-                      handleWorkspaceChange(Number(e.target.value))
+                      handleWorkspaceChange(Number(e.target.value) || 0)
                     }
                     className="w-full rounded-md border border-[#cbd4d1] bg-white px-4 py-3 text-sm font-semibold text-[#18252d] outline-none transition focus:border-[#657f51] focus:ring-4 focus:ring-[#d8f36b]/35"
                   >
                     <option value="">-- 워크스페이스를 선택하세요 --</option>
                     {workspaces.map((ws) => (
                       <option key={ws.id} value={ws.id}>
-                        {ws.name} (ID: #{ws.id})
+                        {ws.name}
                         {ws.description ? ` - ${ws.description}` : ""}
                       </option>
                     ))}
@@ -363,6 +372,12 @@ export default function ProjectCreate() {
                   </p>
                 </div>
 
+                <div>
+                  <label htmlFor="developmentPlan" className="block text-sm font-bold text-[#304047] mb-2">AI 개발계획서</label>
+                  <textarea id="developmentPlan" rows={6} value={planText} onChange={(e) => setPlanText(e.target.value)} placeholder="프로젝트 개발계획서나 요구사항을 입력하세요. 프로젝트 생성 후 AI가 Task로 분해하고 담당자를 배정합니다." className="w-full rounded-md border border-[#cbd4d1] bg-white px-4 py-3 text-sm text-[#18252d] outline-none transition focus:border-[#657f51] focus:ring-4 focus:ring-[#d8f36b]/35" />
+                  <p className="mt-1.5 text-xs text-[#647278]">선택 입력입니다. 입력하면 프로젝트 생성 직후 AI Task가 자동 생성됩니다.</p>
+                </div>
+
                 {/* 4. Project Leader Selection */}
                 <div>
                   <label
@@ -380,12 +395,13 @@ export default function ProjectCreate() {
                       <select
                         id="leaderId"
                         value={leaderId}
-                        onChange={(e) => setLeaderId(Number(e.target.value))}
+                        onChange={(e) => setLeaderId(Number(e.target.value) || 0)}
                         className="w-full rounded-md border border-[#cbd4d1] bg-white px-4 py-3 text-sm text-[#18252d] outline-none transition focus:border-[#657f51] focus:ring-4 focus:ring-[#d8f36b]/35"
                       >
                         {members.map((member) => (
                           <option key={member.id} value={member.userId}>
-                            사용자 ID: #{member.userId} ({member.role}
+                            {member.userName} · {member.email}
+                            {member.userId === currentUser.id ? "나" : "멤버"} ({member.role}
                             {currentUser.id === member.userId ? " - 나" : ""})
                           </option>
                         ))}
@@ -407,10 +423,35 @@ export default function ProjectCreate() {
                       <p className="text-xs text-[#647278]">
                         {isLoadingMembers
                           ? "멤버 목록을 조회 중입니다..."
-                          : "프로젝트 리더가 될 사용자의 User ID를 입력하세요."}
+                          : "프로젝트 리더를 선택할 수 있는 멤버가 없습니다."}
                       </p>
                     </div>
                   )}
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-bold text-[#304047]">프로젝트 멤버</p>
+                  <div className="grid gap-2 rounded-md border border-[#eef1ef] bg-[#f8faf7] p-3 sm:grid-cols-2">
+                    {members.map((member) => (
+                      <label key={member.id} className="flex items-center gap-2 text-sm text-[#304047] [&>span:first-of-type]:hidden">
+                        <input
+                          type="checkbox"
+                          checked={selectedMemberIds.includes(member.userId)}
+                          onChange={(event) => {
+                            setSelectedMemberIds((current) =>
+                              event.target.checked
+                                ? [...current, member.userId]
+                                : current.filter((id) => id !== member.userId),
+                            );
+                          }}
+                        />
+                        <span>{member.userId === currentUser.id ? "나" : "멤버"}</span>
+                        <span>{member.userName} · {member.email}</span>
+                        <span className="text-xs text-[#647278]"></span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-xs text-[#647278]">워크스페이스 멤버를 프로젝트에 함께 초대합니다.</p>
                 </div>
 
                 {/* Form Buttons */}
