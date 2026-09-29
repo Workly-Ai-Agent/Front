@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "../components/layout/Layout";
-import { getWorkspaceProjects, type Project } from "../lib/api";
+import { getTasks, getWorkspaceProjects, type Project } from "../lib/api";
 import { useSessionStore } from "../stores/sessionStore";
 import {
   selectActiveWorkspace,
@@ -13,6 +13,7 @@ export default function Dashboard() {
   const dashboardStats = useSessionStore((state) => state.dashboardStats);
   const workforceMembers = useSessionStore((state) => state.workforceMembers);
   const agentActivities = useSessionStore((state) => state.agentActivities);
+  const setAgentActivities = useSessionStore((state) => state.setAgentActivities);
 
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -41,6 +42,26 @@ export default function Dashboard() {
       ignore = true;
     };
   }, [activeWorkspace]);
+
+  useEffect(() => {
+    if (projects.length === 0) {
+      setAgentActivities([]);
+      return;
+    }
+    Promise.all(projects.map((project) => getTasks(project.id)))
+      .then((taskGroups) => {
+        const aiTasks = taskGroups.flat().filter((task) => task.description?.includes("AI"));
+        if (aiTasks.length > 0) {
+          setAgentActivities([
+            { title: "Task Planner", detail: `${aiTasks.length}개의 Task를 계획서에서 생성했습니다.`, tone: "default" },
+            { title: "Assignment Agent", detail: "생성된 Task를 프로젝트 구성원에게 배정했습니다.", tone: "default" },
+          ]);
+        } else {
+          setAgentActivities([]);
+        }
+      })
+      .catch(() => setAgentActivities([]));
+  }, [projects, setAgentActivities]);
 
   const activeProjects = activeWorkspace ? projects : [];
 
@@ -141,8 +162,7 @@ export default function Dashboard() {
                   </Link>
                 </div>
               ) : (
-                activeProjects.slice(0, 5).map((project, idx) => {
-                  const progressPct = ((idx * 27 + 45) % 80) + 20;
+                activeProjects.slice(0, 5).map((project) => {
                   return (
                     <Link
                       className="grid grid-cols-[1fr_140px_auto] items-center gap-5 border-b border-[#eef1ef] px-5 py-5 transition last:border-b-0 hover:bg-[#f8faf7] max-sm:grid-cols-1 max-sm:gap-3"
@@ -154,17 +174,17 @@ export default function Dashboard() {
                           {project.name}
                         </div>
                         <div className="mt-1 text-xs text-[#647278] line-clamp-1">
-                          {project.description || `리더 ID: #${project.leaderId}`}
+                          {project.description || "프로젝트 설명이 아직 없습니다."}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-[#647278]">
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e7ece8]">
                           <i
                             className="block h-full rounded-full bg-[#657f51]"
-                            style={{ width: `${progressPct}%` }}
+                            style={{ width: "0%" }}
                           />
                         </div>
-                        {progressPct}%
+                        —
                       </div>
                       <span className="whitespace-nowrap rounded-full bg-[#e7f3d0] px-2.5 py-1 text-[11px] font-bold text-[#657f51]">
                         진행 중
@@ -184,7 +204,9 @@ export default function Dashboard() {
               </span>
             </div>
             <div className="p-5">
-              {agentActivities.map(({ title, detail, tone }) => (
+              {agentActivities.length === 0 ? (
+                <p className="py-6 text-sm text-[#647278]">아직 기록된 Agent 활동이 없습니다.</p>
+              ) : agentActivities.map(({ title, detail, tone }) => (
                 <div
                   className="flex gap-3 border-b border-[#eef1ef] py-4 first:pt-0 last:border-0 last:pb-0"
                   key={title}
@@ -220,7 +242,9 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="grid grid-cols-3 gap-4 max-lg:grid-cols-1">
-            {workforceMembers.map(
+            {workforceMembers.length === 0 ? (
+              <div className="col-span-full rounded-lg border border-dashed border-[#cbd4d1] bg-white p-8 text-center text-sm text-[#647278]">등록된 구성원 정보가 없습니다.</div>
+            ) : workforceMembers.map(
               ({ name, role, utilization, availability }) => (
                 <div
                   className="rounded-lg border border-[#dce3df] bg-white p-5 shadow-xs"
