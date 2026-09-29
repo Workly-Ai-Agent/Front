@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { getUserIdFromToken, login } from "../lib/api";
+import { getUserIdFromToken, getUserSkills, login } from "../lib/api";
 import { useSessionStore } from "../stores/sessionStore";
 
 export default function Login() {
@@ -36,7 +36,9 @@ export default function Login() {
       const from =
         (location.state as { from?: { pathname?: string } })?.from?.pathname ||
         "/";
-      navigate(from, { replace: true });
+      const userId = getUserIdFromToken(result.token);
+      const skills = userId ? await getUserSkills(userId) : [];
+      navigate(skills.length === 0 ? "/skills/profile" : from, { replace: true });
     } catch (submitError) {
       setError(
         submitError instanceof Error

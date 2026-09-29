@@ -140,6 +140,7 @@ export default function Layout({ children }: Props) {
               }`
             }
             to="/projects"
+            end
             onClick={() => setIsSidebarOpen(false)}
           >
             <span className="text-base">▣</span>
@@ -155,10 +156,23 @@ export default function Layout({ children }: Props) {
               }`
             }
             to="/workspace/settings"
+            style={{ order: 99 }}
             onClick={() => setIsSidebarOpen(false)}
           >
             <span className="text-base">⚙</span>
             <span>설정 & 멤버 관리</span>
+          </NavLink>
+          <NavLink className={({ isActive }) => `flex items-center gap-3 rounded-md px-3.5 py-3 text-sm transition ${isActive ? "bg-[#d8f36b] font-bold text-[#18252d]" : "text-[#b9c4c7] hover:bg-white/10 hover:text-white"}`} to="/tasks" onClick={() => setIsSidebarOpen(false)}>
+            <span className="text-base">▦</span><span>Task Board</span>
+          </NavLink>
+          <NavLink className={({ isActive }) => `flex items-center gap-3 rounded-md px-3.5 py-3 text-sm transition ${isActive ? "bg-[#d8f36b] font-bold text-[#18252d]" : "text-[#b9c4c7] hover:bg-white/10 hover:text-white"}`} to="/projects/ai-tasks" onClick={() => setIsSidebarOpen(false)}>
+            <span className="text-base">AI</span><span>업무 정리</span>
+          </NavLink>
+          <NavLink className={({ isActive }) => `flex items-center gap-3 rounded-md px-3.5 py-3 text-sm transition ${isActive ? "bg-[#d8f36b] font-bold text-[#18252d]" : "text-[#b9c4c7] hover:bg-white/10 hover:text-white"}`} to="/skills" onClick={() => setIsSidebarOpen(false)}>
+            <span className="text-base">✦</span><span>Skills</span>
+          </NavLink>
+          <NavLink className={({ isActive }) => `flex items-center gap-3 rounded-md px-3.5 py-3 text-sm transition ${isActive ? "bg-[#d8f36b] font-bold text-[#18252d]" : "text-[#b9c4c7] hover:bg-white/10 hover:text-white"}`} to="/messenger" onClick={() => setIsSidebarOpen(false)}>
+            <span className="text-base">◌</span><span>Messenger</span>
           </NavLink>
         </nav>
 

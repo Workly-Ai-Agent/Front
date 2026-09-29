@@ -3,6 +3,10 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(
   "",
 );
 
+export const API_ORIGIN = API_BASE_URL.startsWith("http")
+  ? new URL(API_BASE_URL).origin
+  : window.location.origin;
+
 export type ApiResponse<T> = {
   success: boolean;
   message?: string;
@@ -47,6 +51,8 @@ export type WorkspaceMember = {
   id: number;
   workspaceId: number;
   userId: number;
+  userName: string;
+  email: string;
   role: WorkspaceRole;
   joinedAt: string;
 };
@@ -119,7 +125,12 @@ export function getUserIdFromToken(token?: string | null): number | null {
 
 // --- Generic Request Function ---
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (path.includes("NaN")) {
+    throw new Error("유효하지 않은 식별자입니다. 항목을 다시 선택해주세요.");
+  }
   const token = localStorage.getItem("workly-access-token");
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 120000);
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: "include",
@@ -128,7 +139,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
+    signal: options.signal ?? controller.signal,
   });
+  window.clearTimeout(timeout);
 
   const body = (await response
     .json()
@@ -333,3 +346,58 @@ export function removeProjectMember(projectId: number, userId: number) {
     method: "DELETE",
   });
 }
+
+// ==========================================
+// 4. Task APIs
+// ==========================================
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "COMPLETED" | "BLOCKED";
+export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type Task = {
+  id: number; projectId: number; title: string; description: string | null;
+  assigneeId: number | null; assigneeName?: string | null; status: TaskStatus; priority: TaskPriority;
+  startAt: string | null; dueAt: string | null; createdAt: string; updatedAt: string;
+};
+
+export function updateTaskStatus(id: number, status: TaskStatus) {
+  return request<Task>(`/tasks/${id}/status?status=${status}`, { method: "PATCH" });
+}
+export function updateTask(id: number, payload: { title: string; description?: string; assigneeId?: number | null; status: TaskStatus; priority: TaskPriority; startAt?: string | null; dueAt?: string | null }) {
+  return request<Task>(`/tasks/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+export function getTask(id: number) { return request<Task>(`/tasks/${id}`, { method: "GET" }); }
+export type TaskCreatePayload = { projectId: number; title: string; description?: string; assigneeId?: number; priority?: TaskPriority };
+export function getTasks(projectId?: number) {
+  return request<Task[]>(`/tasks${projectId ? `?projectId=${projectId}` : ""}`, { method: "GET" });
+}
+export function createTask(payload: TaskCreatePayload) {
+  return request<Task>("/tasks", { method: "POST", body: JSON.stringify(payload) });
+}
+
+// ==========================================
+// 5. Skill APIs
+// ==========================================
+export type Skill = { id: number; name: string; description: string | null };
+export type UserSkill = { id: number; skillId: number; skillName: string };
+export function getSkills() { return request<Skill[]>("/skills", { method: "GET" }); }
+export function createSkill(name: string, description?: string) { return request<Skill>("/skills", { method: "POST", body: JSON.stringify({ name, description }) }); }
+export function getUserSkills(userId: number) { return request<UserSkill[]>(`/users/${userId}/skills`, { method: "GET" }); }
+export function addUserSkill(userId: number, skillId: number) { return request<UserSkill>(`/users/${userId}/skills`, { method: "POST", body: JSON.stringify({ skillId }) }); }
+export function deleteUserSkill(userId: number, userSkillId: number) { return request<void>(`/users/${userId}/skills/${userSkillId}`, { method: "DELETE" }); }
+
+// ==========================================
+// 6. Messenger APIs
+// ==========================================
+export type Message = { id: number; workspaceId: number; senderId: number; senderName: string; receiverId: number | null; projectId: number | null; content: string; createdAt: string };
+export function getConversation(workspaceId: number, userId: number) { return request<Message[]>(`/chat/conversations/${userId}?workspaceId=${workspaceId}`, { method: "GET" }); }
+export function sendMessage(workspaceId: number, receiverId: number | null, content: string, projectId?: number | null) { return request<Message>("/chat/messages", { method: "POST", body: JSON.stringify({ workspaceId, receiverId, projectId, content }) }); }
+export function getChannel(workspaceId: number, projectId?: number | null, receiverId?: number | null) { const params = new URLSearchParams({ workspaceId: String(workspaceId) }); if (projectId) params.set("projectId", String(projectId)); if (receiverId) params.set("receiverId", String(receiverId)); return request<Message[]>(`/chat/channels?${params}`, { method: "GET" }); }
+
+export type AgentWorkflow = { status: string; projectName: string; tasks: Array<Record<string, unknown>>; assignments: Array<Record<string, unknown>>; violations: string[]; monitoring: string[]; approved: boolean; log: string[] };
+export function runAgentWorkflow(projectId: number, planText: string) {
+  return request<AgentWorkflow>(`/projects/${projectId}/agent/workflow`, { method: "POST", body: JSON.stringify({ planText }) });
+}
+export function generateAgentTasks(projectId: number, planText: string) {
+  return request<Task[]>(`/projects/${projectId}/agent/generate`, { method: "POST", body: JSON.stringify({ planText }) });
+}
+export type AgentIntent = { intent: string; taskReference: string | null; requestedChange: string | null; requiresReplanning: boolean; confidence: number };
+export function classifyAgentMessage(message: string) { return request<AgentIntent>("/chat/agent-intent", { method: "POST", body: JSON.stringify({ message }) }); }
