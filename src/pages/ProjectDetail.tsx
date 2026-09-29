@@ -255,15 +255,14 @@ export default function ProjectDetail() {
               </Link>
               <span>/</span>
               <span className="font-bold text-[#18252d]">
-                PROJ-{project.id}
+                PROJECT
               </span>
             </div>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#18252d]">
               {project.name}
             </h1>
             <p className="mt-1 text-sm text-[#647278]">
-              리더 ID: #{project.leaderId} · 워크스페이스 ID: #
-              {project.workspaceId}
+              프로젝트 리더와 워크스페이스 정보
             </p>
           </div>
 
@@ -433,7 +432,7 @@ export default function ProjectDetail() {
                               </span>
                             </div>
                             <p className="truncate text-xs text-[#647278]">
-                              {member.email} · ID #{member.userId}
+                              {member.email}
                             </p>
                           </div>
                         </div>
@@ -519,22 +518,22 @@ export default function ProjectDetail() {
                   <select
                     required
                     value={selectedUserId}
-                    onChange={(e) => setSelectedUserId(Number(e.target.value))}
+                    onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : "")}
                     className="w-full rounded-md border border-[#cbd4d1] bg-white px-3.5 py-2.5 text-sm text-[#18252d] outline-none transition focus:border-[#657f51] focus:ring-4 focus:ring-[#d8f36b]/35"
                   >
                     <option value="">-- 워크스페이스 멤버 선택 --</option>
                     {candidateMembers.map((m) => (
                       <option key={m.id} value={m.userId}>
-                        User ID #{m.userId} ({m.role})
+                        {m.userName} ({m.email}) · {m.role}
                       </option>
                     ))}
                   </select>
                 ) : (
                   <div className="space-y-1">
                     <input
-                      type="number"
+                      type="hidden"
                       required
-                      placeholder="추가할 사용자의 User ID 입력"
+                      placeholder="추가할 멤버를 선택하세요"
                       value={selectedUserId}
                       onChange={(e) =>
                         setSelectedUserId(
@@ -544,7 +543,7 @@ export default function ProjectDetail() {
                       className="w-full rounded-md border border-[#cbd4d1] bg-white px-3.5 py-2.5 text-sm text-[#18252d] outline-none transition focus:border-[#657f51] focus:ring-4 focus:ring-[#d8f36b]/35"
                     />
                     <p className="text-[11px] text-[#647278]">
-                      워크스페이스에 등록된 사용자의 User ID를 입력하세요.
+                      워크스페이스에 등록된 멤버만 선택할 수 있습니다.
                     </p>
                   </div>
                 )}
