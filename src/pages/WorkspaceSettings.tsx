@@ -156,11 +156,11 @@ export default function WorkspaceSettings() {
     }
   };
 
-  const handleRemoveMember = async (memberId: number, userId: number) => {
+  const handleRemoveMember = async (memberId: number, _userId: number) => {
     if (!activeWorkspace) return;
     if (
       !confirm(
-        `User ID #${userId} 멤버를 워크스페이스에서 제외하시겠습니까?`
+        `이 멤버를 워크스페이스에서 제외하시겠습니까?`
       )
     ) {
       return;
@@ -380,7 +380,7 @@ export default function WorkspaceSettings() {
                   <thead>
                     <tr className="border-b border-[#eef1ef] text-[11px] font-bold uppercase tracking-wider text-[#8fa0a5]">
                       <th className="pb-3">멤버 정보</th>
-                      <th className="pb-3">User ID</th>
+                      <th className="pb-3">멤버</th>
                       <th className="pb-3">권한 (Role)</th>
                       <th className="pb-3">가입일</th>
                       <th className="pb-3 text-right">작업</th>
@@ -394,15 +394,15 @@ export default function WorkspaceSettings() {
                           <td className="py-3.5">
                             <div className="flex items-center gap-3">
                               <span className="grid size-8 place-items-center rounded-full bg-[#18252d] text-xs font-bold text-[#d8f36b]">
-                                #{member.id}
+                                멤버
                               </span>
                               <span className="font-semibold text-[#18252d]">
-                                멤버 #{member.id}
+                                멤버
                               </span>
                             </div>
                           </td>
                           <td className="py-3.5 font-mono text-xs text-[#647278]">
-                            #{member.userId}
+                            {member.role}
                           </td>
                           <td className="py-3.5">
                             <select
