@@ -240,7 +240,7 @@ export default function Projects() {
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <span className="rounded-md bg-[#f0f7df] px-2.5 py-1 font-mono text-[11px] font-bold text-[#657f51]">
-                      PROJ-{project.id}
+                      PROJECT
                     </span>
                     <button
                       type="button"
