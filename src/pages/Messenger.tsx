@@ -86,7 +86,6 @@ export default function Messenger() {
         }
         catch { setLastIntent(null); }
       }
-      const request = { workspaceId: workspace.id, receiverId: mode === "direct" ? receiverId! : null, content: content.trim() };
       // Persist over HTTP and use WebSocket only for live delivery. Raw STOMP
       // SEND frames have no client acknowledgement, so they can look sent
       // even when the server rejected the session.
