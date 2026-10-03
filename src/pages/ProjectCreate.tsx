@@ -33,7 +33,6 @@ export default function ProjectCreate() {
   // Project form fields
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [planText, setPlanText] = useState("");
   const [leaderId, setLeaderId] = useState<number>(currentUser.id ?? 1);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
@@ -370,12 +369,6 @@ export default function ProjectCreate() {
                   <p className="mt-1.5 text-xs text-[#647278]">
                     최대 1000자까지 입력 가능합니다.
                   </p>
-                </div>
-
-                <div>
-                  <label htmlFor="developmentPlan" className="block text-sm font-bold text-[#304047] mb-2">AI 개발계획서</label>
-                  <textarea id="developmentPlan" rows={6} value={planText} onChange={(e) => setPlanText(e.target.value)} placeholder="프로젝트 개발계획서나 요구사항을 입력하세요. 프로젝트 생성 후 AI가 Task로 분해하고 담당자를 배정합니다." className="w-full rounded-md border border-[#cbd4d1] bg-white px-4 py-3 text-sm text-[#18252d] outline-none transition focus:border-[#657f51] focus:ring-4 focus:ring-[#d8f36b]/35" />
-                  <p className="mt-1.5 text-xs text-[#647278]">선택 입력입니다. 입력하면 프로젝트 생성 직후 AI Task가 자동 생성됩니다.</p>
                 </div>
 
                 {/* 4. Project Leader Selection */}
