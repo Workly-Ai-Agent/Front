@@ -431,3 +431,5 @@ export function generateAgentTasks(projectId: number, planText: string) {
 }
 export type AgentIntent = { intent: string; taskReference: string | null; requestedChange: string | null; requiresReplanning: boolean; confidence: number };
 export function classifyAgentMessage(message: string) { return request<AgentIntent>("/chat/agent-intent", { method: "POST", body: JSON.stringify({ message }) }); }
+export type ExtractedSkill = { name: string; evidence: string };
+export function extractProfileSkills(profileText: string) { return request<{ skills: ExtractedSkill[] }>("/agent/extract-skills", { method: "POST", body: JSON.stringify({ profileText }) }); }
