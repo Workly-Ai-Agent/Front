@@ -131,7 +131,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("workly-access-token");
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 120000);
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  let response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: {
@@ -143,12 +143,42 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
   window.clearTimeout(timeout);
 
-  const body = (await response
+  let body = (await response
     .json()
     .catch(() => null)) as ApiResponse<T> | null;
 
+  const isAuthEndpoint = ["/auth/login", "/auth/signup", "/auth/refresh"].includes(path);
+  if (response.status === 401 && !isAuthEndpoint) {
+    const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    }).catch(() => null);
+    const refreshBody = refreshResponse
+      ? ((await refreshResponse.json().catch(() => null)) as ApiResponse<AuthResponse> | null)
+      : null;
+    const refreshedToken = refreshResponse?.ok && refreshBody?.success
+      ? refreshBody.data?.token
+      : undefined;
+
+    if (refreshedToken) {
+      localStorage.setItem("workly-access-token", refreshedToken);
+      const retryHeaders = new Headers(options.headers);
+      retryHeaders.set("Content-Type", "application/json");
+      retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        credentials: "include",
+        headers: retryHeaders,
+        signal: options.signal ?? controller.signal,
+      });
+      body = (await response.json().catch(() => null)) as ApiResponse<T> | null;
+    }
+  }
+
   if (response.status === 401) {
     localStorage.removeItem("workly-access-token");
+    localStorage.removeItem("workly-session");
     if (
       typeof window !== "undefined" &&
       !window.location.pathname.startsWith("/login") &&

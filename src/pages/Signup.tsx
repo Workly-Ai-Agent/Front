@@ -30,24 +30,28 @@ export default function Signup() {
   };
 
   return (
-    <main className="grid min-h-screen grid-cols-1 bg-[#f4f6f3] min-[761px]:grid-cols-[minmax(320px,0.9fr)_minmax(420px,1.1fr)]">
-      <section className="flex flex-col justify-center bg-[#18252d] p-[clamp(40px,8vw,120px)] text-[#f4f6f3] max-[760px]:min-h-[360px] max-[760px]:px-6 max-[760px]:py-10">
+    <main className="grid min-h-screen grid-cols-1 bg-[#f4f6f3] min-[900px]:grid-cols-[minmax(320px,0.9fr)_minmax(420px,1.1fr)]">
+      <section className="flex flex-col justify-center bg-[#18252d] p-[clamp(28px,5vw,80px)] text-[#f4f6f3] max-[899px]:min-h-[340px] max-[899px]:px-6 max-[899px]:py-10">
         <span className="mb-5 grid size-12 place-items-center rounded-full bg-[#d8f36b] text-2xl font-extrabold text-[#18252d]">
           W
         </span>
         <strong className="font-mono text-sm font-medium uppercase tracking-[0.08em]">
           workly / agent
         </strong>
-        <p className="my-[52px] max-w-[420px] text-[clamp(28px,3.5vw,52px)] font-bold leading-[1.12] max-[760px]:my-8 max-[760px]:text-[34px]">
-          개인 계정으로 로그인하고,
+        <p className="my-10 max-w-[480px] text-[clamp(30px,3.6vw,46px)] font-bold leading-[1.18] max-[899px]:my-7">
+          계정을 만들고,
           <br />
-          팀의 프로젝트를 함께 관리하세요.
+          팀의 프로젝트를
+          <br />
+          함께 관리하세요.
         </p>
-        <div className="max-w-[420px] border-l-2 border-[#d8f36b] pl-4 text-sm leading-[1.7] text-[#b9c4c7]">
-          팀을 직접 만들거나, 초대 링크를 통해 기존 팀에 참여할 수 있습니다.
+        <div className="max-w-[440px] border-l-2 border-[#d8f36b] pl-4 text-sm leading-[1.7] text-[#b9c4c7]">
+          새 팀을 만들거나 초대받은 팀에 참여해
+          <br />
+          프로젝트 업무를 함께 관리하세요.
         </div>
       </section>
-      <section className="grid place-items-center p-[clamp(32px,8vw,120px)] max-[760px]:px-6 max-[760px]:py-14 max-[760px]:pb-[72px]">
+      <section className="grid place-items-center p-[clamp(28px,6vw,88px)] max-[899px]:px-6 max-[899px]:py-12">
         <form
           className="w-full max-w-[460px]"
           aria-labelledby="signup-title"
