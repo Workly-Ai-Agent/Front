@@ -380,12 +380,13 @@ export function removeProjectMember(projectId: number, userId: number) {
 // ==========================================
 // 4. Task APIs
 // ==========================================
-export type TaskStatus = "TODO" | "IN_PROGRESS" | "COMPLETED" | "BLOCKED";
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "COMPLETED" | "BLOCKED" | "CANCELLED";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type Task = {
   id: number; projectId: number; title: string; description: string | null;
   assigneeId: number | null; assigneeName?: string | null; status: TaskStatus; priority: TaskPriority;
-  startAt: string | null; dueAt: string | null; createdAt: string; updatedAt: string;
+  dependsOn: number[]; dependencyTitles: string[];
+  startAt: string | null; dueAt: string | null; overdue: boolean; createdAt: string; updatedAt: string;
 };
 
 export function updateTaskStatus(id: number, status: TaskStatus) {

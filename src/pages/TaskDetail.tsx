@@ -8,6 +8,7 @@ const statuses: { value: TaskStatus; label: string }[] = [
   { value: "IN_PROGRESS", label: "진행 중" },
   { value: "COMPLETED", label: "완료" },
   { value: "BLOCKED", label: "차단됨" },
+  { value: "CANCELLED", label: "계획 제외" },
 ];
 
 export default function TaskDetail() {
@@ -67,6 +68,8 @@ export default function TaskDetail() {
           </div>
           <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
             <div><span className="text-xs text-[#8fa0a5]">담당자</span><p className="mt-1 font-bold">{task.assigneeName || (task.assigneeId ? "배정된 멤버" : "미배정")}</p></div>
+            <div><span className="text-xs text-[#8fa0a5]">우선순위</span><p className="mt-1 font-bold">{task.priority}</p></div>
+            <div><span className="text-xs text-[#8fa0a5]">선행 Task</span><p className="mt-1 font-bold">{task.dependencyTitles.length ? task.dependencyTitles.join(", ") : "없음"}</p></div>
           </div>
         </div>
       </main>
