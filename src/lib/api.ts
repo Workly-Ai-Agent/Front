@@ -428,12 +428,18 @@ export function sendMessage(workspaceId: number, receiverId: number | null, cont
 export function getChannel(workspaceId: number, projectId?: number | null, receiverId?: number | null) { const params = new URLSearchParams({ workspaceId: String(workspaceId) }); if (projectId) params.set("projectId", String(projectId)); if (receiverId) params.set("receiverId", String(receiverId)); return request<Message[]>(`/chat/channels?${params}`, { method: "GET" }); }
 
 export type AgentWorkflow = { status: string; projectName: string; tasks: Array<Record<string, unknown>>; assignments: Array<Record<string, unknown>>; violations: string[]; monitoring: string[]; approved: boolean; log: string[] };
+export type AgentProposal = { id: number; projectId: number; status: "PENDING" | "APPROVED" | "REJECTED"; requestText: string; result: AgentWorkflow; createdAt: string; requirementsStructuredCorrectly: boolean | null; skillMatchingCorrect: boolean | null; impactDetectionCorrect: boolean | null; replanningSuccessful: boolean | null };
+export type MetricRate = { successful: number; evaluated: number; ratePercent: number | null };
+export type ProjectAgentMetrics = { requirementStructuring: MetricRate; taskCreation: MetricRate; skillMatching: MetricRate; changeImpactDetection: MetricRate; replanning: MetricRate };
 export function runAgentWorkflow(projectId: number, planText: string) {
   return request<AgentWorkflow>(`/projects/${projectId}/agent/workflow`, { method: "POST", body: JSON.stringify({ planText }) });
 }
-export function generateAgentTasks(projectId: number, planText: string) {
-  return request<Task[]>(`/projects/${projectId}/agent/generate`, { method: "POST", body: JSON.stringify({ planText }) });
-}
+export function generateAgentTasks(projectId: number, planText: string) { return request<AgentProposal>(`/projects/${projectId}/agent/generate`, { method: "POST", body: JSON.stringify({ planText }) }); }
+export function getAgentProposals(projectId: number) { return request<AgentProposal[]>(`/projects/${projectId}/agent/proposals`); }
+export function approveAgentProposal(proposalId: number) { return request<Task[]>(`/agent/proposals/${proposalId}/approve`, { method: "POST" }); }
+export function rejectAgentProposal(proposalId: number) { return request<void>(`/agent/proposals/${proposalId}/reject`, { method: "POST" }); }
+export function evaluateAgentProposal(proposalId: number, evaluation: { requirementsStructuredCorrectly: boolean; skillMatchingCorrect: boolean; impactDetectionCorrect: boolean; replanningSuccessful: boolean }) { return request<void>(`/agent/proposals/${proposalId}/evaluation`, { method: "POST", body: JSON.stringify(evaluation) }); }
+export function getProjectAgentMetrics(projectId: number) { return request<ProjectAgentMetrics>(`/projects/${projectId}/agent/metrics`); }
 export type AgentIntent = { intent: string; taskReference: string | null; requestedChange: string | null; requiresReplanning: boolean; confidence: number };
 export function classifyAgentMessage(message: string) { return request<AgentIntent>("/chat/agent-intent", { method: "POST", body: JSON.stringify({ message }) }); }
 export type ExtractedSkill = { name: string; evidence: string };
