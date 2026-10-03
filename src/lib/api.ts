@@ -399,6 +399,10 @@ export type TaskCreatePayload = { projectId: number; title: string; description?
 export function getTasks(projectId?: number) {
   return request<Task[]>(`/tasks${projectId ? `?projectId=${projectId}` : ""}`, { method: "GET" });
 }
+export type TaskMonitor = { overdue: Task[]; unassigned: Task[]; dependencyBlocked: Array<{ taskId: number; taskTitle: string; blockedBy: string[] }> };
+export function getTaskMonitor(projectId: number) { return request<TaskMonitor>(`/tasks/monitor?projectId=${projectId}`); }
+export type WorkspaceTaskSummary = { workspaceId: number; active: number; completed: number; overdue: number; unassigned: number; projects: Array<{ projectId: number; projectName: string; active: number; completed: number; overdue: number; unassigned: number }> };
+export function getWorkspaceTaskSummary(workspaceId: number) { return request<WorkspaceTaskSummary>(`/tasks/workspace-summary?workspaceId=${workspaceId}`); }
 export function createTask(payload: TaskCreatePayload) {
   return request<Task>("/tasks", { method: "POST", body: JSON.stringify(payload) });
 }

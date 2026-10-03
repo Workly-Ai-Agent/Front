@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useRef } from "react";
+import { Link } from "react-router-dom";
 import Layout from "../components/layout/Layout";
-import { API_ORIGIN, getChannel, getWorkspaceMembers, sendMessage, type Message, type WorkspaceMember } from "../lib/api";
+import { API_ORIGIN, classifyAgentMessage, getChannel, getWorkspaceMembers, getWorkspaceTaskSummary, sendMessage, type AgentIntent, type Message, type WorkspaceMember, type WorkspaceTaskSummary } from "../lib/api";
 import { selectActiveWorkspace, useWorkspaceStore } from "../stores/workspaceStore";
 
 type Conversation = "workspace" | "project" | "direct";
@@ -14,6 +15,8 @@ export default function Messenger() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [content, setContent] = useState("");
   const [error, setError] = useState("");
+  const [lastIntent, setLastIntent] = useState<AgentIntent | null>(null);
+  const [statusSummary, setStatusSummary] = useState<WorkspaceTaskSummary | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -44,17 +47,26 @@ export default function Messenger() {
     const socket = new WebSocket(`${API_ORIGIN.replace(/^http/, "ws")}/ws`);
     socketRef.current = socket;
     socket.onopen = () => {
-      socket.send(`CONNECT\naccept-version:1.2\nauthorization:Bearer ${token}\n\n\0`);
-      socket.send(`SUBSCRIBE\nid:chat-${workspace.id}\ndestination:${destination}\nack:auto\n\n\0`);
+      socket.send(`CONNECT\naccept-version:1.2\nAuthorization:Bearer ${token}\n\n\0`);
     };
     socket.onmessage = (event) => {
-      const body = String(event.data).split("\n\n")[1]?.replace(/\0$/, "");
+      const frame = String(event.data);
+      if (frame.startsWith("CONNECTED")) {
+        socket.send(`SUBSCRIBE\nid:chat-${workspace.id}\ndestination:${destination}\nack:auto\n\n\0`);
+        return;
+      }
+      if (frame.startsWith("ERROR")) {
+        setError("채팅 서버가 연결을 거부했습니다. 로그인 상태와 워크스페이스 멤버 권한을 확인해 주세요.");
+        return;
+      }
+      const body = frame.split("\n\n")[1]?.replace(/\0$/, "");
       if (!body) return;
       try {
         const incoming = JSON.parse(body) as Message;
         setMessages((current) => current.some((item) => item.id === incoming.id) ? current : [...current, incoming]);
       } catch { /* ignore STOMP CONNECTED frames */ }
     };
+    socket.onerror = () => setError("채팅 서버에 연결하지 못했습니다.");
     return () => { socket.close(); socketRef.current = null; };
   }, [workspace, mode, receiverId]);
 
@@ -63,13 +75,23 @@ export default function Messenger() {
     if (!workspace || !content.trim()) return;
     if (mode === "direct" && !receiverId) return;
     try {
-      const request = { workspaceId: workspace.id, receiverId: mode === "direct" ? receiverId! : null, content: content.trim() };
-      if (socketRef.current?.readyState === WebSocket.OPEN) {
-        socketRef.current.send(`SEND\ndestination:/app/chat.send\ncontent-type:application/json\n\n${JSON.stringify(request)}\0`);
-      } else {
-        const message = await sendMessage(workspace.id, mode === "direct" ? receiverId! : null, content.trim());
-        setMessages((current) => [...current, message]);
+      if (mode === "workspace") {
+        try {
+          const intent = await classifyAgentMessage(content.trim());
+          setLastIntent(intent);
+          if (intent.intent === "STATUS_QUERY") {
+            try { setStatusSummary(await getWorkspaceTaskSummary(workspace.id)); }
+            catch (e) { setError(e instanceof Error ? e.message : "업무 현황을 불러오지 못했습니다."); }
+          } else setStatusSummary(null);
+        }
+        catch { setLastIntent(null); }
       }
+      const request = { workspaceId: workspace.id, receiverId: mode === "direct" ? receiverId! : null, content: content.trim() };
+      // Persist over HTTP and use WebSocket only for live delivery. Raw STOMP
+      // SEND frames have no client acknowledgement, so they can look sent
+      // even when the server rejected the session.
+      const message = await sendMessage(workspace.id, mode === "direct" ? receiverId! : null, content.trim());
+      setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
       setContent("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "메시지 전송에 실패했습니다.");
@@ -97,6 +119,8 @@ export default function Messenger() {
           <section className="flex flex-col">
             <div className="border-b border-[#eef1ef] p-5 font-bold">{title}</div>
             <div className="flex-1 space-y-3 overflow-y-auto bg-[#fbfcfa] p-5">{messages.map((message) => <div key={message.id} className="max-w-[75%] rounded-xl border border-[#dce3df] bg-white p-3 text-sm"><p className="mb-2 text-xs font-bold text-[#657f51]">{message.senderName}</p><p>{message.content}</p><span className="mt-2 block text-[10px] text-[#8fa0a5]">{new Date(message.createdAt).toLocaleString("ko-KR")}</span></div>)}</div>
+            {lastIntent && <div className="border-t border-[#eef1ef] bg-[#f8faf7] px-5 py-3 text-xs"><b>AI 의도 분석: {lastIntent.intent}</b>{lastIntent.requestedChange && <p className="mt-1 text-[#647278]">요청: {lastIntent.requestedChange}</p>}{lastIntent.requiresReplanning && <Link to="/projects/ai-tasks" state={{ request: lastIntent.requestedChange }} className="mt-2 inline-block font-bold text-[#657f51]">프로젝트 업무 정리에서 재계획 제안 만들기 →</Link>}</div>}
+            {statusSummary && <div className="border-t border-[#eef1ef] bg-[#f8faf7] px-5 py-3"><p className="text-xs font-bold">워크스페이스 업무 현황</p><p className="mt-2 text-xs">진행 중 {statusSummary.active} · 완료 {statusSummary.completed} · 기한 초과 {statusSummary.overdue} · 미배정 {statusSummary.unassigned}</p>{statusSummary.projects.map((project) => <p key={project.projectId} className="mt-1 text-xs text-[#647278]">{project.projectName}: 진행 {project.active}, 초과 {project.overdue}, 미배정 {project.unassigned}</p>)}</div>}
             <form onSubmit={submit} className="flex gap-3 border-t border-[#eef1ef] p-4"><input disabled={mode === "direct" && !receiverId} value={content} onChange={(e) => setContent(e.target.value)} placeholder="메시지를 입력하세요" className="min-w-0 flex-1 rounded-md border border-[#cbd4d1] px-3 py-2.5 text-sm" /><button disabled={!content.trim()} className="rounded-md bg-[#18252d] px-5 text-sm font-bold text-white disabled:opacity-40">전송</button></form>
           </section>
         </div>
