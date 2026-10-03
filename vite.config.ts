@@ -11,6 +11,10 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         "/api": env.VITE_BACKEND_URL ?? "http://localhost:8080",
+        "/ws": {
+          target: env.VITE_BACKEND_URL ?? "http://localhost:8080",
+          ws: true,
+        },
       },
     },
     plugins: [
