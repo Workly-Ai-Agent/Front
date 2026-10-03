@@ -1,42 +1,64 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "../components/layout/Layout";
-import { getTasks, getWorkspaceProjects, type Project } from "../lib/api";
-import { useSessionStore } from "../stores/sessionStore";
+import {
+  getAgentProposals,
+  getWorkspaceProjects,
+  type AgentProposal,
+  type Project,
+} from "../lib/api";
+import { useSessionStore, type AgentActivity } from "../stores/sessionStore";
 import {
   selectActiveWorkspace,
   useWorkspaceStore,
 } from "../stores/workspaceStore";
 
+function toAgentActivity(proposal: AgentProposal): AgentActivity {
+  const modeLabel = proposal.mode === "CHAT_UPDATE"
+    ? "채팅 Task 반영"
+    : proposal.mode === "ADD_TASKS"
+      ? "새 Task 제안"
+      : "전체 계획 제안";
+  const statusLabel = proposal.status === "PENDING"
+    ? "승인 대기"
+    : proposal.status === "APPROVED" ? "승인됨" : "거절됨";
+  const date = new Date(proposal.createdAt).toLocaleString("ko-KR", {
+    month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+  const request = proposal.requestText.trim();
+  const shortRequest = request.length > 72 ? `${request.slice(0, 72)}…` : request;
+  return {
+    title: `${modeLabel} · ${statusLabel}`,
+    detail: `${date}${shortRequest ? ` — ${shortRequest}` : ""}`,
+    tone: proposal.status === "PENDING" ? "orange" : "default",
+  };
+}
+
 export default function Dashboard() {
   const user = useSessionStore((state) => state.user);
   const dashboardStats = useSessionStore((state) => state.dashboardStats);
-  const workforceMembers = useSessionStore((state) => state.workforceMembers);
-  const agentActivities = useSessionStore((state) => state.agentActivities);
-  const setAgentActivities = useSessionStore((state) => state.setAgentActivities);
-
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [agentActivities, setAgentActivities] = useState<AgentActivity[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [isLoadingOverview, setIsLoadingOverview] = useState(false);
 
   useEffect(() => {
     let ignore = false;
-    if (!activeWorkspace) return;
+    if (!activeWorkspace) {
+      setProjects([]);
+      return;
+    }
+    setProjects([]);
 
     Promise.resolve().then(() => {
       if (!ignore) setIsLoadingProjects(true);
     });
 
     getWorkspaceProjects(activeWorkspace.id)
-      .then((data) => {
-        if (!ignore) setProjects(data);
-      })
-      .catch(() => {
-        if (!ignore) setProjects([]);
-      })
-      .finally(() => {
-        if (!ignore) setIsLoadingProjects(false);
-      });
+      .then((data) => { if (!ignore) setProjects(data); })
+      .catch(() => { if (!ignore) setProjects([]); })
+      .finally(() => { if (!ignore) setIsLoadingProjects(false); });
 
     return () => {
       ignore = true;
@@ -44,24 +66,27 @@ export default function Dashboard() {
   }, [activeWorkspace]);
 
   useEffect(() => {
+    let ignore = false;
     if (projects.length === 0) {
       setAgentActivities([]);
+      setIsLoadingOverview(false);
       return;
     }
-    Promise.all(projects.map((project) => getTasks(project.id)))
-      .then((taskGroups) => {
-        const aiTasks = taskGroups.flat().filter((task) => task.description?.includes("AI"));
-        if (aiTasks.length > 0) {
-          setAgentActivities([
-            { title: "Task Planner", detail: `${aiTasks.length}개의 Task를 계획서에서 생성했습니다.`, tone: "default" },
-            { title: "Assignment Agent", detail: "생성된 Task를 프로젝트 구성원에게 배정했습니다.", tone: "default" },
-          ]);
-        } else {
-          setAgentActivities([]);
-        }
-      })
-      .catch(() => setAgentActivities([]));
-  }, [projects, setAgentActivities]);
+    setIsLoadingOverview(true);
+    Promise.all(projects.map(async (project) => {
+      return getAgentProposals(project.id).catch(() => []);
+    })).then((results) => {
+      if (ignore) return;
+      const recentProposals = results
+        .flat()
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+        .slice(0, 5);
+      setAgentActivities(recentProposals.map(toAgentActivity));
+    }).finally(() => {
+      if (!ignore) setIsLoadingOverview(false);
+    });
+    return () => { ignore = true; };
+  }, [projects]);
 
   const activeProjects = activeWorkspace ? projects : [];
 
@@ -200,16 +225,18 @@ export default function Dashboard() {
             <div className="flex items-center justify-between border-b border-[#dce3df] px-5 py-4">
               <h2 className="font-bold text-[#18252d]">Agent activity</h2>
               <span className="font-mono text-[10px] font-bold tracking-widest text-[#657f51]">
-                LIVE
+                최근 제안
               </span>
             </div>
             <div className="p-5">
-              {agentActivities.length === 0 ? (
+              {isLoadingOverview ? (
+                <p className="py-6 text-sm text-[#647278]">Agent 활동을 불러오고 있습니다...</p>
+              ) : agentActivities.length === 0 ? (
                 <p className="py-6 text-sm text-[#647278]">아직 기록된 Agent 활동이 없습니다.</p>
               ) : agentActivities.map(({ title, detail, tone }) => (
                 <div
                   className="flex gap-3 border-b border-[#eef1ef] py-4 first:pt-0 last:border-0 last:pb-0"
-                  key={title}
+                  key={`${title}-${detail}`}
                 >
                   <span
                     className={`mt-1.5 size-2 shrink-0 rounded-full ${
@@ -226,57 +253,6 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Bottom Section: Capacity Overview */}
-        <section className="mt-10">
-          <div className="mb-4 flex items-end justify-between gap-5 max-md:items-start max-md:flex-col">
-            <div>
-              <p className="mb-2 font-mono text-xs uppercase tracking-[0.08em] text-[#647278]">
-                Capacity overview
-              </p>
-              <h2 className="text-2xl font-bold text-[#18252d]">
-                Workforce pulse
-              </h2>
-            </div>
-            <Link to="/workspace/settings" className="text-sm font-bold text-[#657f51] hover:underline">
-              워크스페이스 멤버 관리 →
-            </Link>
-          </div>
-          <div className="grid grid-cols-3 gap-4 max-lg:grid-cols-1">
-            {workforceMembers.length === 0 ? (
-              <div className="col-span-full rounded-lg border border-dashed border-[#cbd4d1] bg-white p-8 text-center text-sm text-[#647278]">등록된 구성원 정보가 없습니다.</div>
-            ) : workforceMembers.map(
-              ({ name, role, utilization, availability }) => (
-                <div
-                  className="rounded-lg border border-[#dce3df] bg-white p-5 shadow-xs"
-                  key={name}
-                >
-                  <div className="mb-6 flex items-center gap-3">
-                    <span className="grid size-10 place-items-center rounded-full bg-[#d8f36b] font-bold text-[#18252d]">
-                      {name.slice(0, 1)}
-                    </span>
-                    <div>
-                      <h3 className="text-sm font-bold text-[#18252d]">{name}</h3>
-                      <p className="mt-1 text-xs text-[#647278]">{role}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-[#647278]">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e7ece8]">
-                      <i
-                        className="block h-full rounded-full bg-[#657f51]"
-                        style={{ width: utilization }}
-                      />
-                    </div>
-                    {utilization}
-                  </div>
-                  <div className="mt-5 flex justify-between border-t border-[#eef1ef] pt-4 text-xs text-[#647278]">
-                    <span>{availability}</span>
-                    <span className="text-[#657f51] font-semibold">Skill fit high</span>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        </section>
       </div>
     </Layout>
   );
