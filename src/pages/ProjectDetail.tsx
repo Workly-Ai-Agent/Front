@@ -9,15 +9,16 @@ import {
   getWorkspaceMembers,
   removeProjectMember,
   updateProject,
-  updateProjectMemberRole,
   type Project,
   type ProjectMember,
   type WorkspaceMember,
 } from "../lib/api";
+import { useSessionStore } from "../stores/sessionStore";
 
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const currentUserId = useSessionStore((state) => state.user.id);
 
   const [project, setProject] = useState<Project | null>(null);
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -36,7 +37,6 @@ export default function ProjectDetail() {
   // Add Member state
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | "">("");
-  const [selectedRole, setSelectedRole] = useState<"MEMBER" | "LEADER">("MEMBER");
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
 
@@ -139,18 +139,17 @@ export default function ProjectDetail() {
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId || !selectedUserId) return;
+    if (!projectId || !selectedUserId || !isProjectLeader) return;
     setIsAddingMember(true);
     setMemberError(null);
     try {
       const added = await addProjectMember(Number(projectId), {
         userId: Number(selectedUserId),
-        role: selectedRole,
+        role: "MEMBER",
       });
       setMembers((prev) => [...prev, added]);
       setIsAddMemberModalOpen(false);
       setSelectedUserId("");
-      setSelectedRole("MEMBER");
     } catch (err) {
       setMemberError(
         err instanceof Error
@@ -159,29 +158,6 @@ export default function ProjectDetail() {
       );
     } finally {
       setIsAddingMember(false);
-    }
-  };
-
-  const handleRoleChange = async (
-    userId: number,
-    newRole: "MEMBER" | "LEADER"
-  ) => {
-    if (!projectId) return;
-    try {
-      const updated = await updateProjectMemberRole(
-        Number(projectId),
-        userId,
-        newRole
-      );
-      setMembers((prev) =>
-        prev.map((m) => (m.userId === userId ? updated : m))
-      );
-    } catch (err) {
-      alert(
-        err instanceof Error
-          ? err.message
-          : "멤버 역할 수정 중 오류가 발생했습니다."
-      );
     }
   };
 
@@ -205,6 +181,9 @@ export default function ProjectDetail() {
   // Candidates for adding to project (workspace members not yet in this project)
   const candidateMembers = workspaceMembers.filter(
     (wm) => !members.some((pm) => pm.userId === wm.userId)
+  );
+  const isProjectLeader = members.some(
+    (member) => member.userId === currentUserId && member.role === "LEADER"
   );
 
   if (isLoading) {
@@ -382,13 +361,13 @@ export default function ProjectDetail() {
                     이 프로젝트에 할당된 팀원과 역할을 관리합니다.
                   </p>
                 </div>
-                <button
+                {isProjectLeader && <button
                   type="button"
                   onClick={() => setIsAddMemberModalOpen(true)}
                   className="flex items-center gap-1.5 rounded-md bg-[#18252d] px-3.5 py-2 text-xs font-bold text-[#f4f6f3] transition hover:bg-[#304047]"
                 >
                   <span>+</span> 멤버 추가
-                </button>
+                </button>}
               </div>
 
               {/* Member list */}
@@ -437,23 +416,7 @@ export default function ProjectDetail() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          {/* Role switch toggle/select */}
-                          <select
-                            value={member.role}
-                            onChange={(e) =>
-                              handleRoleChange(
-                                member.userId,
-                                e.target.value as "MEMBER" | "LEADER"
-                              )
-                            }
-                            className="rounded border border-[#cbd4d1] bg-white px-2 py-1 text-xs font-semibold text-[#18252d] outline-none transition focus:border-[#657f51]"
-                          >
-                            <option value="MEMBER">MEMBER</option>
-                            <option value="LEADER">LEADER</option>
-                          </select>
-
-                          {/* Remove button */}
+                        {isProjectLeader && <div className="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
                             onClick={() =>
@@ -467,7 +430,7 @@ export default function ProjectDetail() {
                           >
                             × 제외
                           </button>
-                        </div>
+                        </div>}
                       </div>
                     );
                   })}
@@ -479,7 +442,7 @@ export default function ProjectDetail() {
       </div>
 
       {/* Add Member Modal */}
-      {isAddMemberModalOpen && (
+      {isAddMemberModalOpen && isProjectLeader && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#18252d]/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl border border-[#dce3df] bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#eef1ef] pb-4">
@@ -549,35 +512,9 @@ export default function ProjectDetail() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#304047] mb-1.5">
-                  프로젝트 역할
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${
-                      selectedRole === "MEMBER"
-                        ? "border-[#657f51] bg-[#f0f7df] text-[#18252d]"
-                        : "border-[#cbd4d1] bg-white text-[#647278] hover:bg-[#f4f6f3]"
-                    }`}
-                    onClick={() => setSelectedRole("MEMBER")}
-                  >
-                    MEMBER
-                  </button>
-                  <button
-                    type="button"
-                    className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${
-                      selectedRole === "LEADER"
-                        ? "border-[#657f51] bg-[#f0f7df] text-[#18252d]"
-                        : "border-[#cbd4d1] bg-white text-[#647278] hover:bg-[#f4f6f3]"
-                    }`}
-                    onClick={() => setSelectedRole("LEADER")}
-                  >
-                    LEADER
-                  </button>
-                </div>
-              </div>
+              <p className="rounded-md bg-[#f8faf7] p-3 text-xs text-[#647278]">
+                새 프로젝트 멤버는 MEMBER 권한으로 추가됩니다.
+              </p>
 
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button

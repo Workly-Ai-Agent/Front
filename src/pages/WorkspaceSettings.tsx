@@ -5,10 +5,10 @@ import {
   addWorkspaceMember,
   getWorkspaceMembers,
   removeWorkspaceMember,
-  updateWorkspaceMemberRole,
   type WorkspaceMember,
   type WorkspaceRole,
 } from "../lib/api";
+import { useSessionStore } from "../stores/sessionStore";
 import {
   selectActiveWorkspace,
   useWorkspaceStore,
@@ -19,6 +19,7 @@ export default function WorkspaceSettings() {
   const activeWorkspace = useWorkspaceStore(selectActiveWorkspace);
   const updateWorkspace = useWorkspaceStore((state) => state.updateWorkspace);
   const deleteWorkspace = useWorkspaceStore((state) => state.deleteWorkspace);
+  const currentUserId = useSessionStore((state) => state.user.id);
 
   // Workspace Info State
   const [name, setName] = useState(() => activeWorkspace?.name ?? "");
@@ -51,6 +52,9 @@ export default function WorkspaceSettings() {
 
   // Delete Workspace State
   const [isDeleting, setIsDeleting] = useState(false);
+  const isWorkspaceAdmin = members.some(
+    (member) => member.userId === currentUserId && member.role === "ADMIN"
+  );
 
   useEffect(() => {
     let ignore = false;
@@ -130,29 +134,6 @@ export default function WorkspaceSettings() {
       );
     } finally {
       setIsInviting(false);
-    }
-  };
-
-  const handleUpdateMemberRole = async (
-    memberId: number,
-    newRole: WorkspaceRole
-  ) => {
-    if (!activeWorkspace) return;
-    try {
-      const updated = await updateWorkspaceMemberRole(
-        activeWorkspace.id,
-        memberId,
-        newRole
-      );
-      setMembers((prev) =>
-        prev.map((m) => (m.id === memberId ? updated : m))
-      );
-    } catch (err) {
-      alert(
-        err instanceof Error
-          ? err.message
-          : "멤버 역할 수정 중 오류가 발생했습니다."
-      );
     }
   };
 
@@ -305,6 +286,9 @@ export default function WorkspaceSettings() {
             </div>
 
             {/* Invite Form */}
+            {isLoadingMembers ? (
+              <div className="mb-8 rounded-xl border border-[#dce3df] bg-[#f8faf7] p-5 text-sm text-[#647278]">권한을 확인하고 있습니다...</div>
+            ) : isWorkspaceAdmin ? (
             <div className="mb-8 rounded-xl border border-[#dce3df] bg-[#f8faf7] p-5">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#18252d] mb-3">
                 + 새 멤버 추가하기
@@ -364,6 +348,11 @@ export default function WorkspaceSettings() {
                 </button>
               </form>
             </div>
+            ) : (
+              <div className="mb-8 rounded-xl border border-[#dce3df] bg-[#f8faf7] p-5 text-sm text-[#647278]">
+                워크스페이스 멤버 초대와 관리는 ADMIN만 할 수 있습니다.
+              </div>
+            )}
 
             {/* Members List Table */}
             {isLoadingMembers ? (
@@ -380,10 +369,9 @@ export default function WorkspaceSettings() {
                   <thead>
                     <tr className="border-b border-[#eef1ef] text-[11px] font-bold uppercase tracking-wider text-[#8fa0a5]">
                       <th className="pb-3">멤버 정보</th>
-                      <th className="pb-3">멤버</th>
                       <th className="pb-3">권한 (Role)</th>
                       <th className="pb-3">가입일</th>
-                      <th className="pb-3 text-right">작업</th>
+                      {isWorkspaceAdmin && <th className="pb-3 text-right">작업</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#eef1ef]">
@@ -394,41 +382,25 @@ export default function WorkspaceSettings() {
                           <td className="py-3.5">
                             <div className="flex items-center gap-3">
                               <span className="grid size-8 place-items-center rounded-full bg-[#18252d] text-xs font-bold text-[#d8f36b]">
-                                멤버
+                                {member.userName.slice(0, 1).toUpperCase()}
                               </span>
-                              <span className="font-semibold text-[#18252d]">
-                                멤버
-                              </span>
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-[#18252d]">{member.userName}</p>
+                                <p className="truncate text-xs text-[#647278]">{member.email}</p>
+                              </div>
                             </div>
                           </td>
-                          <td className="py-3.5 font-mono text-xs text-[#647278]">
-                            {member.role}
-                          </td>
                           <td className="py-3.5">
-                            <select
-                              value={member.role}
-                              onChange={(e) =>
-                                handleUpdateMemberRole(
-                                  member.id,
-                                  e.target.value as WorkspaceRole
-                                )
-                              }
-                              className={`rounded-md border px-2.5 py-1 text-xs font-bold outline-none transition ${
-                                isAdmin
-                                  ? "border-[#18252d] bg-[#18252d] text-[#d8f36b]"
-                                  : "border-[#cbd4d1] bg-white text-[#18252d]"
-                              }`}
-                            >
-                              <option value="MEMBER">MEMBER</option>
-                              <option value="ADMIN">ADMIN</option>
-                            </select>
+                            <span className={`rounded-md border px-2.5 py-1 text-xs font-bold ${isAdmin ? "border-[#18252d] bg-[#18252d] text-[#d8f36b]" : "border-[#cbd4d1] bg-white text-[#18252d]"}`}>
+                              {isAdmin ? "ADMIN" : "MEMBER"}
+                            </span>
                           </td>
                           <td className="py-3.5 text-xs text-[#647278]">
                             {new Date(member.joinedAt).toLocaleDateString(
                               "ko-KR"
                             )}
                           </td>
-                          <td className="py-3.5 text-right">
+                          {isWorkspaceAdmin && <td className="py-3.5 text-right">
                             <button
                               type="button"
                               onClick={() =>
@@ -438,7 +410,7 @@ export default function WorkspaceSettings() {
                             >
                               내보내기
                             </button>
-                          </td>
+                          </td>}
                         </tr>
                       );
                     })}
