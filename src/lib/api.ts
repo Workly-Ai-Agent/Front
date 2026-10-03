@@ -129,25 +129,37 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new Error("유효하지 않은 식별자입니다. 항목을 다시 선택해주세요.");
   }
   const token = localStorage.getItem("workly-access-token");
+  const isAuthEndpoint = ["/auth/login", "/auth/signup", "/auth/refresh"].includes(path);
+  const redirectToDashboard = () => {
+    if (typeof window !== "undefined" && window.location.pathname !== "/") {
+      window.location.assign("/");
+    }
+  };
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 120000);
-  let response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-    signal: options.signal ?? controller.signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+      signal: options.signal ?? controller.signal,
+    });
+  } catch (error) {
+    window.clearTimeout(timeout);
+    if (!isAuthEndpoint) redirectToDashboard();
+    throw error;
+  }
   window.clearTimeout(timeout);
 
   let body = (await response
     .json()
     .catch(() => null)) as ApiResponse<T> | null;
 
-  const isAuthEndpoint = ["/auth/login", "/auth/signup", "/auth/refresh"].includes(path);
   if (response.status === 401 && !isAuthEndpoint) {
     const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: "POST",
@@ -189,6 +201,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok || !body?.success) {
+    if (!isAuthEndpoint && response.status !== 401) redirectToDashboard();
     throw new Error(body?.message ?? "요청을 처리하지 못했습니다.");
   }
 
