@@ -21,6 +21,7 @@ export default function ProjectAiTasks() {
   const [evaluation, setEvaluation] = useState({ requirementsStructuredCorrectly: true, skillMatchingCorrect: true, impactDetectionCorrect: true, replanningSuccessful: true });
   const [error, setError] = useState("");
   const [isRunning, setIsRunning] = useState(false);
+  const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
   const [openMessageMenuId, setOpenMessageMenuId] = useState<number | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const socketRef = useRef<WebSocket | null>(null);
@@ -166,6 +167,7 @@ export default function ProjectAiTasks() {
   const applyFromConversation = async (message?: Message) => {
     if (!project || !request.trim() && !message) return;
     setIsRunning(true);
+    setIsGeneratingProposal(true);
     setError("");
     try {
       const instruction = message?.content ?? request.trim();
@@ -183,6 +185,7 @@ export default function ProjectAiTasks() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "AI Task 반영에 실패했습니다.");
     } finally {
+      setIsGeneratingProposal(false);
       setIsRunning(false);
     }
   };
@@ -235,6 +238,7 @@ export default function ProjectAiTasks() {
         {metrics && <section className="mt-4 rounded-2xl border border-[#dce3df] bg-white p-6"><h2 className="font-bold">프로젝트 AI 품질 지표</h2><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{([["요구사항 구조화", metrics.requirementStructuring], ["Task 생성", metrics.taskCreation], ["Skill 매칭", metrics.skillMatching], ["변경 영향 탐지", metrics.changeImpactDetection], ["AI 재계획", metrics.replanning]] as const).map(([label, value]) => <div key={label} className="rounded-lg bg-[#f8faf7] p-3"><p className="text-xs text-[#647278]">{label}</p><p className="mt-1 font-bold">{value.ratePercent === null ? "평가 대기" : `${value.ratePercent.toFixed(1)}%`} <span className="text-xs font-normal text-[#647278]">({value.successful}/{value.evaluated})</span></p></div>)}</div><p className="mt-3 text-[11px] text-[#8fa0a5]">Task 생성률은 결정된 제안 중 Leader가 승인한 비율입니다. 나머지 정확도는 Leader 평가 표본을 기준으로 계산합니다.</p></section>}
         <section className="mt-6 rounded-2xl border border-[#dce3df] bg-white p-6">
           <h2 className="font-bold">프로젝트 채팅</h2>
+          {isGeneratingProposal && <p role="status" className="mt-3 rounded-md bg-[#f1f6e8] p-3 text-sm text-[#526b3f]">채팅 내용을 확인하고 AI Agent에 Task 반영안을 요청하는 중입니다. 완료되면 승인 대기 제안으로 표시됩니다.</p>}
           <div className="mt-4 max-h-96 space-y-3 overflow-y-auto rounded-xl bg-[#f8faf7] p-4">
             {messages.length === 0 && <p className="text-sm text-[#647278]">아직 프로젝트 채팅이 없습니다.</p>}
             {messages.map((message) => <div key={message.id} className="relative rounded-lg border border-[#dce3df] bg-white p-3"><div className="flex items-start justify-between gap-3"><p className="text-xs font-bold text-[#657f51]">{message.senderName}</p><div className="relative"><button type="button" aria-label="메시지 메뉴 열기" aria-expanded={openMessageMenuId === message.id} onClick={() => setOpenMessageMenuId((current) => current === message.id ? null : message.id)} className="-mr-1 -mt-2 rounded-md px-2 py-1 text-xl leading-none text-[#647278] hover:bg-[#f1f4ef]">⋮</button>{openMessageMenuId === message.id && <div className="absolute right-0 top-8 z-10 min-w-48 rounded-lg border border-[#dce3df] bg-white p-1 shadow-lg"><button type="button" onClick={() => { setOpenMessageMenuId(null); void applyFromConversation(message); }} disabled={isRunning} className="w-full rounded-md px-3 py-2 text-left text-xs font-bold text-[#304047] hover:bg-[#f8faf7] disabled:opacity-40">이 메시지로 Task 반영</button></div>}</div></div><p className="mt-1 whitespace-pre-wrap text-sm text-[#304047]">{message.content}</p><span className="mt-2 block text-[10px] text-[#8fa0a5]">{new Date(message.createdAt).toLocaleString("ko-KR")}</span></div>)}
