@@ -124,7 +124,11 @@ export function getUserIdFromToken(token?: string | null): number | null {
 }
 
 // --- Generic Request Function ---
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  requestConfig: { timeoutMs?: number; keepPageOnFailure?: boolean } = {},
+): Promise<T> {
   if (path.includes("NaN")) {
     throw new Error("유효하지 않은 식별자입니다. 항목을 다시 선택해주세요.");
   }
@@ -139,7 +143,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
   // Agent workflows can include a cold start and multiple sequential model calls.
   // Keep the browser request alive slightly longer than the backend's 600s timeout.
-  const timeout = window.setTimeout(() => controller.abort(), isAgentWorkflowRequest ? 660000 : 120000);
+  const timeout = window.setTimeout(
+    () => controller.abort(),
+    requestConfig.timeoutMs ?? (isAgentWorkflowRequest ? 660000 : 120000),
+  );
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
@@ -155,9 +162,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   } catch (error) {
     window.clearTimeout(timeout);
     // Keep the user on the proposal page so they can see/retry a workflow failure.
-    if (!isAuthEndpoint && !isAgentWorkflowRequest) redirectToDashboard();
-    if (error instanceof DOMException && error.name === "AbortError" && isAgentWorkflowRequest) {
-      throw new Error("AI 처리 응답을 기다리는 시간이 초과되었습니다. 잠시 후 제안 목록을 새로고침해 확인해주세요.");
+    if (!isAuthEndpoint && !isAgentWorkflowRequest && !requestConfig.keepPageOnFailure) redirectToDashboard();
+    if (error instanceof DOMException && error.name === "AbortError" && (isAgentWorkflowRequest || requestConfig.keepPageOnFailure)) {
+      throw new Error("AI 반영 요청을 준비하는 동안 서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.");
     }
     throw error;
   }
@@ -417,8 +424,8 @@ export function updateTask(id: number, payload: { title: string; description?: s
 }
 export function getTask(id: number) { return request<Task>(`/tasks/${id}`, { method: "GET" }); }
 export type TaskCreatePayload = { projectId: number; title: string; description?: string; assigneeId?: number; priority?: TaskPriority };
-export function getTasks(projectId?: number) {
-  return request<Task[]>(`/tasks${projectId ? `?projectId=${projectId}` : ""}`, { method: "GET" });
+export function getTasks(projectId?: number, requestConfig?: { timeoutMs?: number; keepPageOnFailure?: boolean }) {
+  return request<Task[]>(`/tasks${projectId ? `?projectId=${projectId}` : ""}`, { method: "GET" }, requestConfig);
 }
 export type TaskMonitor = { overdue: Task[]; unassigned: Task[]; dependencyBlocked: Array<{ taskId: number; taskTitle: string; blockedBy: string[] }> };
 export function getTaskMonitor(projectId: number) { return request<TaskMonitor>(`/tasks/monitor?projectId=${projectId}`); }
