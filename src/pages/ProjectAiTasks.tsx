@@ -174,7 +174,8 @@ export default function ProjectAiTasks() {
       const planText = message
         ? `사용자가 아래 프로젝트 채팅 메시지를 직접 선택해 Task 반영을 요청했습니다. 현재 Task 목록과 대조해 새 업무 추가인지 기존 업무 수정인지 판단하세요. 변경이 필요한 Task만 제안하고, 기존 Task를 수정할 때는 task_reference에 현재 제목을 넣으세요. 제목 변경이 요청되지 않았다면 task는 현재 제목을 유지하세요. changes에는 제목, 설명, 담당자, 우선순위, 시작일, 기한, 선행 업무, 상태 중 사용자가 명시한 항목만 넣으세요. 나머지 값은 그대로 유지하세요. 새 업무라면 새 Task로 제안하세요. 메시지 작성자가 자신이 담당하겠다고 명확히 말하면 그 작성자를 담당자로 추천하세요.\n[요청 작성자: ${message.senderName}]\n[선택한 메시지]\n${instruction}`
         : `프로젝트 채팅을 바탕으로 Task를 반영해줘.\n[대화]\n${messages.map((item) => `${item.senderName}: ${item.content}`).join("\n")}\n[적용 요청]\n${instruction}`;
-      const existing = await getTasks(project.id);
+      // This request also wakes the backend on a cold start; give it more than the generic API timeout.
+      const existing = await getTasks(project.id, { timeoutMs: 240000, keepPageOnFailure: true });
       const existingTaskContext = existing.map((task) => `#${task.id} ${task.title} | ${task.status} | 담당: ${task.assigneeName ?? "미지정"} | 우선순위: ${task.priority} | 시작: ${task.startAt ?? "미정"} | 기한: ${task.dueAt ?? "미정"} | 설명: ${task.description ?? "없음"} | 선행 업무: ${task.dependencyTitles.join(", ") || "없음"}`).join("\n");
       const planTextWithExisting = message
         ? `${planText}\n\n[현재 Task 목록: 변경 대상 식별 및 중복 방지용]\n${existingTaskContext || "현재 등록된 Task 없음"}\n\n현재 Task를 수정하는 요청이면 해당 Task만 변경 제안에 포함하세요. 새 업무 요청이면 기존 업무와 겹치지 않는 새 Task만 포함하세요. 요청과 무관한 기존 Task는 결과에서 제외하세요.`
