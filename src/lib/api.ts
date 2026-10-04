@@ -130,13 +130,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   const token = localStorage.getItem("workly-access-token");
   const isAuthEndpoint = ["/auth/login", "/auth/signup", "/auth/refresh"].includes(path);
+  const isAgentWorkflowRequest = path.includes("/agent/generate") || path.includes("/agent/workflow");
   const redirectToDashboard = () => {
     if (typeof window !== "undefined" && window.location.pathname !== "/") {
       window.location.assign("/");
     }
   };
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 120000);
+  // Agent workflows can include a cold start and multiple sequential model calls.
+  // Keep the browser request alive slightly longer than the backend's 600s timeout.
+  const timeout = window.setTimeout(() => controller.abort(), isAgentWorkflowRequest ? 660000 : 120000);
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
@@ -151,7 +154,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     });
   } catch (error) {
     window.clearTimeout(timeout);
-    if (!isAuthEndpoint) redirectToDashboard();
+    // Keep the user on the proposal page so they can see/retry a workflow failure.
+    if (!isAuthEndpoint && !isAgentWorkflowRequest) redirectToDashboard();
+    if (error instanceof DOMException && error.name === "AbortError" && isAgentWorkflowRequest) {
+      throw new Error("AI 처리 응답을 기다리는 시간이 초과되었습니다. 잠시 후 제안 목록을 새로고침해 확인해주세요.");
+    }
     throw error;
   }
   window.clearTimeout(timeout);
